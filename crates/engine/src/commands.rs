@@ -605,6 +605,44 @@ pub fn with_links(s: &Session, clips: &[ClipId]) -> Vec<ClipId> {
     out
 }
 
+/// `clips` plus every clip grouped with them (`clip.group`) and, when linked selection is on, their
+/// linked partners, repeated until nothing more joins: the partner of a grouped clip brings the
+/// group along. Groups always select together; Alt-click (`linked: false`) picks one member.
+pub fn with_groups_and_links(s: &Session, clips: &[ClipId]) -> Vec<ClipId> {
+    let mut out = with_links(s, &with_groups(s, clips));
+    loop {
+        // both steps only add, so an unchanged length means nothing joined
+        let next = with_links(s, &with_groups(s, &out));
+        if next.len() == out.len() {
+            return out;
+        }
+        out = next;
+    }
+}
+
+/// Keep each selected identity once, then add every clip that shares a group with one of them.
+fn with_groups(s: &Session, clips: &[ClipId]) -> Vec<ClipId> {
+    let mut out = Vec::new();
+    for c in clips {
+        if !out.contains(c) {
+            out.push(*c);
+        }
+    }
+    let Some(seq) = s.active_sequence() else { return out };
+    let groups: Vec<u64> = out.iter().filter_map(|c| seq.find_item(*c).and_then(|(_, i)| i.group)).collect();
+    if groups.is_empty() {
+        return out;
+    }
+    for t in seq.all_tracks() {
+        for i in &t.items {
+            if i.group.is_some_and(|g| groups.contains(&g)) && !out.contains(&i.id) {
+                out.push(i.id);
+            }
+        }
+    }
+    out
+}
+
 /// The delta a trim of `clips` (a clip and its linked partners) can apply together: `delta`
 /// clamped by each one's media and neighbours.
 fn clamp_trim_linked(q: &filmcraft_project::Sequence, clips: &[ClipId], edge: Edge, mode: TrimMode, delta: Tick, ctx: &edit::EditCtx) -> Result<Tick> {
@@ -2776,7 +2814,7 @@ fn build() -> Vec<CommandSpec> {
             }
             let clips: Vec<ClipId> =
                 p.get("clips").and_then(Value::as_array).map(|a| a.iter().filter_map(|v| v.as_u64().map(ClipId)).collect()).unwrap_or_default();
-            let clips = if bool_p(p, "linked").unwrap_or(true) { with_links(s, &clips) } else { clips };
+            let clips = if bool_p(p, "linked").unwrap_or(true) { with_groups_and_links(s, &clips) } else { clips };
             // selecting clips leaves trim mode (Premiere: clip and edit point selections are exclusive)
             s.state.edit_points.clear();
             s.state.trim_shift = Default::default();

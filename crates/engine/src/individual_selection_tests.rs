@@ -125,3 +125,26 @@ fn explicit_clear_and_ripple_targets_keep_the_linked_selection_setting() {
         }
     }
 }
+
+/// Grouped clips select (and so drag) together; Alt-click still picks one member.
+#[test]
+fn grouped_clips_select_together() {
+    let (mut s, [(v0, a0), (v1, a1)]) = paired_sequence();
+    s.execute("timeline.select", json!({"clips": [v0.0, v1.0], "linked": false})).unwrap();
+    s.execute("clip.group", json!({})).unwrap();
+    s.execute("timeline.select", json!({"clips": [v0.0]})).unwrap();
+    for c in [v0, a0, v1, a1] {
+        assert!(s.state.selection.contains(&c), "group member {c:?} is selected");
+    }
+    // the linked partner of a grouped clip brings the group along
+    s.execute("timeline.select", json!({"clips": [a0.0]})).unwrap();
+    for c in [v0, a0, v1, a1] {
+        assert!(s.state.selection.contains(&c), "{c:?} is selected from the partner");
+    }
+    s.execute("timeline.select", json!({"clips": [v0.0], "linked": false})).unwrap();
+    assert_eq!(s.state.selection, vec![v0], "Alt-click selects one member");
+    s.execute("timeline.select", json!({"clips": [v0.0, v1.0], "linked": false})).unwrap();
+    s.execute("clip.ungroup", json!({})).unwrap();
+    s.execute("timeline.select", json!({"clips": [v0.0]})).unwrap();
+    assert!(!s.state.selection.contains(&v1), "ungrouped clips select alone");
+}
