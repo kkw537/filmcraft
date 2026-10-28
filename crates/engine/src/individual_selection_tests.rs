@@ -148,3 +148,43 @@ fn grouped_clips_select_together() {
     s.execute("timeline.select", json!({"clips": [v0.0]})).unwrap();
     assert!(!s.state.selection.contains(&v1), "ungrouped clips select alone");
 }
+
+/// Copies of a group (Option-drag, copy and paste) form a group of their own: selecting a copy
+/// leaves the originals alone, so the next drag moves or copies only what was clicked.
+#[test]
+fn copies_of_a_group_do_not_join_the_original_group() {
+    for how in ["drag", "paste"] {
+        let (mut s, [(v0, a0), (v1, a1)]) = paired_sequence();
+        let originals = [v0, a0, v1, a1];
+        s.execute("timeline.select", json!({"clips": [v0.0, a0.0, v1.0, a1.0], "linked": false})).unwrap();
+        s.execute("clip.group", json!({})).unwrap();
+        s.execute("timeline.select", json!({"clips": [v0.0]})).unwrap();
+        let end = s.active_sequence().unwrap().duration();
+        if how == "drag" {
+            let q = s.active_sequence().unwrap();
+            let moves: Vec<_> = originals
+                .iter()
+                .map(|c| {
+                    let (t, i) = q.find_item(*c).unwrap();
+                    json!({"clip": c.0, "track": t.0, "time": (i.start + end).0})
+                })
+                .collect();
+            s.execute("timeline.move", json!({"moves": moves, "copy": true, "linked": false})).unwrap();
+        } else {
+            s.execute("edit.copy", json!({})).unwrap();
+            s.set_playhead(end);
+            s.execute("edit.paste", json!({})).unwrap();
+        }
+        let q = s.active_sequence().unwrap();
+        let copies: Vec<_> = q.all_tracks().flat_map(|t| t.items.iter()).filter(|i| !originals.contains(&i.id)).map(|i| i.id).collect();
+        assert_eq!(copies.len(), 4, "{how}: the whole group was copied");
+        let g = |c| q.find_item(c).unwrap().1.group;
+        assert!(g(copies[0]).is_some() && copies.iter().all(|c| g(*c) == g(copies[0])), "{how}: the copies are one group");
+        assert_ne!(g(copies[0]), g(v0), "{how}: not the originals' group");
+        s.execute("timeline.select", json!({"clips": [copies[0].0]})).unwrap();
+        assert_eq!(s.state.selection.len(), 4, "{how}: a copy selects its own group");
+        assert!(originals.iter().all(|c| !s.state.selection.contains(c)), "{how}: the originals stay unselected");
+        s.execute("timeline.select", json!({"clips": [v0.0]})).unwrap();
+        assert!(copies.iter().all(|c| !s.state.selection.contains(c)), "{how}: an original does not select the copies");
+    }
+}

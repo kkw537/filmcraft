@@ -3989,6 +3989,9 @@ fn paste(s: &mut Session, insert: bool) -> Result<Value> {
     let end = s.edit_sequence(if insert { "Paste Insert" } else { "Paste" }, |q, ctx, st| {
         let mut placements = Vec::new();
         let mut links = std::collections::HashMap::new();
+        // pasted clips get groups of their own, as their links: sharing the originals' group
+        // would select (and so drag or delete) the originals with them
+        let mut groups = std::collections::HashMap::new();
         for (kind, ti, item) in clip {
             let tracks = q.tracks(kind);
             let Some(t) = tracks.get(ti).or(tracks.last()) else { continue };
@@ -3997,6 +4000,9 @@ fn paste(s: &mut Session, insert: bool) -> Result<Value> {
             it.start += at;
             if let Some(l) = it.link {
                 it.link = Some(*links.entry(l).or_insert_with(|| ctx.alloc()));
+            }
+            if let Some(g) = it.group {
+                it.group = Some(*groups.entry(g).or_insert_with(|| ctx.alloc()));
             }
             placements.push((t.id, it));
         }
