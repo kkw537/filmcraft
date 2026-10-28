@@ -2833,7 +2833,14 @@ fn build() -> Vec<CommandSpec> {
                     }
                 }
             } else {
-                s.state.selection = clips;
+                // a raw (unlinked) id list may repeat a clip; keep the first of each, in order
+                let mut unique: Vec<ClipId> = Vec::with_capacity(clips.len());
+                for c in clips {
+                    if !unique.contains(&c) {
+                        unique.push(c);
+                    }
+                }
+                s.state.selection = unique;
                 s.state.caption_selection.clear();
             }
             Ok(json!({"selection": s.state.selection.iter().map(|c| c.0).collect::<Vec<_>>()}))
