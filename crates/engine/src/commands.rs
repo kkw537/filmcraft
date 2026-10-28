@@ -2834,9 +2834,10 @@ fn build() -> Vec<CommandSpec> {
                 }
             } else {
                 // a raw (unlinked) id list may repeat a clip; keep the first of each, in order
+                let mut seen = std::collections::HashSet::with_capacity(clips.len());
                 let mut unique: Vec<ClipId> = Vec::with_capacity(clips.len());
                 for c in clips {
-                    if !unique.contains(&c) {
+                    if seen.insert(c) {
                         unique.push(c);
                     }
                 }
