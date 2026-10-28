@@ -188,3 +188,22 @@ fn copies_of_a_group_do_not_join_the_original_group() {
         assert!(copies.iter().all(|c| !s.state.selection.contains(c)), "{how}: an original does not select the copies");
     }
 }
+
+/// Toggling a partly selected group flips the whole group one way: the requested clip decides
+/// add or remove once, instead of each member flipping its own state.
+#[test]
+fn toggling_a_partly_selected_group_flips_it_as_a_whole() {
+    let (mut s, [(v0, a0), (v1, a1)]) = paired_sequence();
+    let group = [v0, a0, v1, a1];
+    s.execute("timeline.select", json!({"clips": [v0.0, v1.0], "linked": false})).unwrap();
+    s.execute("clip.group", json!({})).unwrap();
+    // only v1 selected: toggling the unselected v0 adds the whole group
+    s.execute("timeline.select", json!({"clips": [v1.0], "linked": false})).unwrap();
+    s.execute("timeline.select", json!({"clips": [v0.0], "toggle": true})).unwrap();
+    assert!(group.iter().all(|c| s.state.selection.contains(c)), "the whole group is selected: {:?}", s.state.selection);
+    assert_eq!(s.state.selection.len(), 4, "no member is listed twice");
+    // only v0 selected: toggling the selected v0 removes the whole group
+    s.execute("timeline.select", json!({"clips": [v0.0], "linked": false})).unwrap();
+    s.execute("timeline.select", json!({"clips": [v0.0], "toggle": true})).unwrap();
+    assert!(s.state.selection.is_empty(), "the whole group is deselected: {:?}", s.state.selection);
+}
