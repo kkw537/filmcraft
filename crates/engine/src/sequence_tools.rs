@@ -529,6 +529,10 @@ pub(crate) fn lay_out_tracks_like(new: &mut filmcraft_project::Sequence, from: &
     }
 }
 
+/// Make Subsequence: copy the selected clips (with linked partners), or everything between In
+/// and Out on the targeted tracks, into a new sequence named `name` or `<seq>_Sub_NN`. Copies
+/// get fresh ids, links and groups and start from zero; the new sequence opens in the Source
+/// Monitor.
 fn make_subsequence(s: &mut Session, p: &Value) -> Result<Value> {
     let seq_id = s.state.active_sequence.ok_or(EngineError::NoSequence)?;
     let q = s.active_sequence().ok_or(EngineError::NoSequence)?.clone();

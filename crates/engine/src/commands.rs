@@ -3984,6 +3984,9 @@ fn cut_range(q: &filmcraft_project::Sequence, tracks: &[TrackId], range: TimeRan
     Some((clips, markers))
 }
 
+/// Paste the clipboard at the playhead (`insert` ripples later clips right instead of
+/// overwriting). Caption clipboards go to the caption track. Pasted clips get fresh ids, links
+/// and groups of their own, are selected, and the playhead moves to their end.
 fn paste(s: &mut Session, insert: bool) -> Result<Value> {
     if !s.state.caption_clipboard.is_empty() {
         return crate::captions::paste(s, insert);
